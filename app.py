@@ -55,6 +55,14 @@ if env_path.exists():
 else:
     load_dotenv()
 
+# Sinkronkan GEMINI_API_KEY dari st.secrets jika berjalan di Streamlit Cloud
+try:
+    if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+        os.environ["GEMINI_API_KEY"] = str(st.secrets["GEMINI_API_KEY"]).strip()
+except Exception:
+    pass
+
+
 import pandas as pd
 from ocr_engine import extract_text_rapid_ocr, extract_with_gemini_vision, extract_nutrition_facts_vision, parse_nutrition_facts_text
 from translator_engine import translate_indonesian_to_english, translate_serving_text
@@ -1344,8 +1352,17 @@ with st.sidebar:
         st.session_state.user_fullname = None
         st.rerun()
 
-    # Pengaturan backend otomatis tanpa mengotori sidebar
-    gemini_api_key = os.environ.get("GEMINI_API_KEY", "")
+    # Pengaturan backend otomatis tanpa mengotori sidebar: ambil API Key dari st.secrets, os.environ, atau session_state
+    gemini_api_key = ""
+    try:
+        if "GEMINI_API_KEY" in st.secrets and st.secrets["GEMINI_API_KEY"]:
+            gemini_api_key = str(st.secrets["GEMINI_API_KEY"]).strip()
+    except Exception:
+        pass
+    if not gemini_api_key:
+        gemini_api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not gemini_api_key:
+        gemini_api_key = st.session_state.get("custom_gemini_api_key", "").strip()
     page_size = "A4"
     include_logo_in_a4 = True
     include_image_in_pdf = True
@@ -1572,6 +1589,20 @@ if current_image is not None:
             help="Tandai area tabel komposisi/gizi saja dengan kotak pemotong agar pembacaan OCR lebih terfokus dan akurat."
         )
 
+    if "Gemini" in st.session_state.engine_choice and not gemini_api_key:
+        st.warning("Kunci API Gemini belum terhubung di server online ini. Masukkan kunci API Anda di bawah agar Gemini Vision AI aktif:", icon=":material/key:")
+        col_k1, col_k2 = st.columns([3, 1])
+        with col_k1:
+            input_k = st.text_input("Kunci API Gemini:", type="password", key="custom_gemini_key_input", placeholder="Tempelkan API Key Gemini (AQ.Ab8...)", label_visibility="collapsed")
+        with col_k2:
+            if st.button("Aktifkan Gemini", type="primary", use_container_width=True):
+                if input_k.strip():
+                    st.session_state.custom_gemini_api_key = input_k.strip()
+                    os.environ["GEMINI_API_KEY"] = input_k.strip()
+                    gemini_api_key = input_k.strip()
+                    st.success("API Key Gemini berhasil disimpan!")
+                    st.rerun()
+
     cropped_img = None
     target_image = current_image
 
@@ -1797,6 +1828,8 @@ if current_image is not None:
                         st.session_state.nutrition_scan_completed = True
                         st.success(f"Teks nilai gizi ({len(st.session_state.nutrition_items)} baris) berhasil dibaca secara lokal dan diterjemahkan.")
                 else:
+                    if "Gemini" in active_engine and not gemini_api_key:
+                        st.warning("Kunci API Gemini (GEMINI_API_KEY) belum terhubung di server. Pemindaian dialihkan ke Mesin OCR Lokal (RapidOCR).", icon=":material/key_off:")
                     raw_id = extract_text_rapid_ocr(target_image)
                     st.session_state.nutrition_raw_id = raw_id
                     trans_en = translate_indonesian_to_english(raw_id)
@@ -1848,6 +1881,8 @@ if current_image is not None:
                         st.success("Berhasil dipindai menggunakan Mesin OCR Lokal dan diterjemahkan.")
                 else:
                     # Mode Lokal RapidOCR + Translator
+                    if "Gemini" in active_engine and not gemini_api_key:
+                        st.warning("Kunci API Gemini (GEMINI_API_KEY) belum terhubung di server. Pemindaian dialihkan ke Mesin OCR Lokal (RapidOCR).", icon=":material/key_off:")
                     raw_id = extract_text_rapid_ocr(target_image)
                     st.session_state.raw_text_id = raw_id
                     trans_en = translate_indonesian_to_english(raw_id)
