@@ -1,0 +1,17 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables & secrets (JANGAN DI-UPLOAD KE PUBLIK)
+.env
+.streamlit/secrets.toml
+
+# Operating System files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Temporary images / generated previews
+preview_*.png
+test_output.pdf
